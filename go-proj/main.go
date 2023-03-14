@@ -83,6 +83,14 @@ func parseBreakpointData(ctx context.Context) error {
 
 	for _, callFrame := range ev.CallFrames {
 		fmt.Println(callFrame.URL)
+		stackFile := "file:///home/yk/TI/cloudfix-linter/development/cdk-dbg/my-project2/lib/my-project2-stack.ts"
+		mainFile := "file:///home/yk/TI/cloudfix-linter/development/cdk-dbg/my-project2/bin/my-project2.ts"
+		var src *debugger.GetScriptSourceReply
+		if callFrame.URL == stackFile || callFrame.URL == mainFile {
+			scriptId := callFrame.Location.ScriptID
+			src, err = client.Debugger.GetScriptSource(ctx, &debugger.GetScriptSourceArgs{ScriptID: scriptId})
+			fmt.Println(src, err)
+		}
 		// for viewing variables
 		var a []*runtime.GetPropertiesReply
 		var b []*runtime.AwaitPromiseReply
