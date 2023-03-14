@@ -12,6 +12,7 @@ import (
 	"github.com/mafredri/cdp"
 	"github.com/mafredri/cdp/devtool"
 	"github.com/mafredri/cdp/protocol/debugger"
+	"github.com/mafredri/cdp/protocol/runtime"
 	"github.com/mafredri/cdp/rpcc"
 )
 
@@ -82,7 +83,14 @@ func parseBreakpointData(ctx context.Context) error {
 
 	for _, callFrame := range ev.CallFrames {
 		fmt.Println(callFrame.URL)
+		// for viewing variables
+		z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
+			fmt.Println(z, err)
 		for _, scope := range callFrame.ScopeChain {
+
+			// for viewing variables
+			// z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scope.Object.ObjectID})
+			// fmt.Println(z, err)
 			if scope.Object.Value == nil && scope.Object.UnserializableValue == nil && scope.Object.WebDriverValue == nil {
 				continue
 			}
