@@ -84,8 +84,11 @@ func parseBreakpointData(ctx context.Context) error {
 	for _, callFrame := range ev.CallFrames {
 		fmt.Println(callFrame.URL)
 		// for viewing variables
-		z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
-			fmt.Println(z, err)
+		z, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
+			if len(z.Result) > 1 && callFrame.FunctionName == "MyProject2Stack" {
+				fmt.Println("Result")
+				fmt.Println(z.Result[1].Value)
+			}
 		for _, scope := range callFrame.ScopeChain {
 
 			// for viewing variables
