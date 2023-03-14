@@ -84,20 +84,27 @@ func parseBreakpointData(ctx context.Context) error {
 	for _, callFrame := range ev.CallFrames {
 		fmt.Println(callFrame.URL)
 		// for viewing variables
-		z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
-			fmt.Println(z, err)
+		var a []*runtime.GetPropertiesReply
+		var b []*runtime.AwaitPromiseReply
+
 		for _, scope := range callFrame.ScopeChain {
 
 			// for viewing variables
-			// z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scope.Object.ObjectID})
-			// fmt.Println(z, err)
-			if scope.Object.Value == nil && scope.Object.UnserializableValue == nil && scope.Object.WebDriverValue == nil {
-				continue
+			z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scope.Object.ObjectID})
+			if err != nil {
+				fmt.Println("Error: ", err)
 			}
-			fmt.Println("ClassName: ", scope.Object.ClassName)
-			fmt.Println("Description: ", scope.Object.Description)
-			fmt.Println("UnsValue: ", scope.Object.UnserializableValue)
+			a = append(a, z)
+
+			y, err := client.Runtime.AwaitPromise(ctx, &runtime.AwaitPromiseArgs{PromiseObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
+			if err != nil {
+				fmt.Println("Error: ", err)
+			}
+			b = append(b, y)
 		}
+
+		// breakpoint here for checking a and b
+		fmt.Sprintf("To enable Breakpoint at this line for a and b")
 	}
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	wg.Add(1)
