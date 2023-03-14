@@ -22,6 +22,22 @@
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
             ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "CDK Debugger",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "runtimeArgs": [
+                "-r",
+                "${workspaceFolder}/my-project2/node_modules/ts-node/register/transpile-only"
+            ],
+            // Entry point of your stack
+            "args": [
+                "${workspaceFolder}/my-project2/bin/my-project2.ts"
+            ]
         }
     ]
 }
