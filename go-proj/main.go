@@ -116,6 +116,7 @@ func parseBreakpointData(ctx context.Context) error {
 			genline, gencol := callFrame.Location.LineNumber+1, *callFrame.Location.ColumnNumber
 			file, fn, sourceline, sourcecol, ok := smap.Source(genline, gencol)
 			fmt.Println(file, fn, sourceline, sourcecol, ok)
+			// original use's source code
 			cnt := smap.SourceContent(strings.Replace(mapURL, "file://", "", -1))
 			fmt.Println(cnt)
 		}
