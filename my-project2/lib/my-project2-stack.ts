@@ -21,13 +21,13 @@ export class MyProject2Stack extends Stack {
 
     new s3.Bucket(this,"Bucket2_in_P")
     
-    new SqsToLambda(this, 'SqsToLambdaPattern', {
-      lambdaFunctionProps: {
-        runtime: lambda.Runtime.NODEJS_14_X,
-        handler: 'index.handler',
-        code: lambda.Code.fromAsset(`lambda`)
-      }
-    });
+    // new SqsToLambda(this, 'SqsToLambdaPattern', {
+    //   lambdaFunctionProps: {
+    //     runtime: lambda.Runtime.NODEJS_14_X,
+    //     handler: 'index.handler',
+    //     code: lambda.Code.fromAsset(`lambda`)
+    //   }
+    // });
 
     // The code that defines your stack goes here
 

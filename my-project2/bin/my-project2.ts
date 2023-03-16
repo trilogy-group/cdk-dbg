@@ -19,4 +19,5 @@ new MyProject2Stack(app, 'MyStack', {
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 });
+console.log("SYNTH HERE OR NOT")
 

@@ -13,6 +13,8 @@ import (
 	"github.com/mafredri/cdp/devtool"
 	"github.com/mafredri/cdp/protocol/debugger"
 	"github.com/mafredri/cdp/protocol/runtime"
+
+	// "github.com/mafredri/cdp/protocol/runtime"
 	"github.com/mafredri/cdp/rpcc"
 )
 
@@ -50,11 +52,26 @@ func run(timeout time.Duration) error {
 
 	curDir, _ := os.Getwd()
 	parDir := filepath.Dir(curDir)
+	// urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
+	// columnNumber := 9
+	// client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
+	// 	URLRegex:     &urlRegex,
+	// 	LineNumber:   368,
+	// 	ColumnNumber: &columnNumber,
+	// })
+	//"/my-project2/node_modules/ts-node/dist/bin.js$"
+	// urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
+	// columnNumber :=0
+	// client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
+	// 	URLRegex:     &urlRegex,
+	// 	LineNumber:   131,
+	// 	ColumnNumber: &columnNumber,
+	// })
 	urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
-	columnNumber := 9
+	columnNumber :=8
 	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
 		URLRegex:     &urlRegex,
-		LineNumber:   368,
+		LineNumber:   129,
 		ColumnNumber: &columnNumber,
 	})
 
@@ -67,83 +84,69 @@ func run(timeout time.Duration) error {
 	}
 
 	wg.Add(1)
-	go parseBreakpointData(ctx)
+	go parseResourceDataBreakpointData(ctx)
 
 	wg.Wait()
 	return nil
 }
 
-func parseBreakpointData(ctx context.Context) error {
+func parseResourceDataBreakpointData(ctx context.Context) error {
 	defer wg.Done()
 	ev, err := pausedClient.Recv()
 	if err != nil {
 		return err
 	}
 	fmt.Println(ev.Reason)
-	var Id_Scope map[string][]string
 
-	var functionNames = map[string]string{
-		"Construct":"Construct",
-	}
-	for indexCF, callFrame := range ev.CallFrames {
-		fmt.Println(callFrame.URL)
-		val,ok := functionNames[callFrame.FunctionName]
-
-		// To see what data is being retuned in z visit 
-		//https://pkg.go.dev/github.com/mafredri/cdp@v0.33.0/protocol/runtime#PropertyDescriptor
-		//https://pkg.go.dev/github.com/mafredri/cdp@v0.33.0/protocol/runtime#GetPropertiesReply
-		if ok && ev.Reason !="Break on start"{
-			fmt.Print("FUNCTION NAME FOUND ",val," INDEX OF CF ",indexCF)
-			z, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
-			for ind,data := range z.Result{
-				fmt.Print("\nDATA FOR INDEX ",ind)
-				fmt.Print("\nDATA = ",data)
-				fmt.Print("\n Data.Value =",data.Value)
-				if data.Value.ClassName !=nil{ 
-					fmt.Print("\n Data.Value.Class ",*data.Value.ClassName)
-					_,ok := Id_Scope[data.Name]
-				if ok{
-					var res []string 
-					res = append(res, *data.Value.Description)
-					Id_Scope[data.Name] = res
-				}else{
-					Id_Scope[data.Name] = append(Id_Scope[data.Name], *data.Value.Description)
+	if ev.Reason == "other"{
+		for _,callFrame := range ev.CallFrames{
+			// fmt.Print(callFrame.URL)
+			if callFrame.FunctionName != ""{
+				fmt.Print("\nFUNCTION NAME ",callFrame.FunctionName)
+				// accessing all the scopes 
+				for _,scope := range callFrame.ScopeChain{
+					z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scope.Object.ObjectID})
+					if err != nil {
+						fmt.Print("Error in getting callstack detials")
+					}
+					fmt.Print("\nlength of z",len(z.Result))
+					fmt.Print("\nZ internal Props ",z.InternalProperties)
+					fmt.Print("\nZ private Props ",z.PrivateProperties)
+					for ind,data := range z.Result{
+						fmt.Print("\nDATA FOR INDEX ",ind)
+						fmt.Print("\nDATA = ",data)
+						fmt.Print("\n Data.Value =",data.Value)
+					}
 				}
-				}
-				if data.Value.Description != nil{
-					fmt.Print("\n Data.Value.Description ",*data.Value.Description)
-				}
-				fmt.Print("\n Data.Value.Type ",data.Value.Type)
-				fmt.Print("\n Data.Value.Preview ",data.Value.Preview)
-				fmt.Print("\n Data.Value.CustomPreview ",data.Value.CustomPreview)
 				
-					
-
-
+			}else if callFrame.FunctionName == "synth"{
+				fmt.Print("Functionname ",callFrame.FunctionName)
+				z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
+					if err != nil {
+						fmt.Print("Error in getting callstack detials")
+					}
+					fmt.Print("\nlength of z",len(z.Result))
+					fmt.Print("\nZ internal Props ",z.InternalProperties)
+					fmt.Print("\nZ private Props ",z.PrivateProperties)
+					for ind,data := range z.Result{
+						fmt.Print("\nDATA FOR INDEX ",ind)
+						fmt.Print("\nDATA = ",data)
+						fmt.Print("\n Data.Value =",data.Value)
+					}
 				
-
-				// scope,ok := Id_Scope[data.Name]
-				// if ok{
-				// 	var val []string 
-				// 	val = append(val, string(*data.Value.ClassName))
-				// 	Id_Scope[data.Name] = val
-				// }
-				// fmt.Print("\nWritable ",*data.Writable)
-				// fmt.Print("\nISOWN ",*data.IsOwn)
+			}else{
+				break
 			}
 		}
-		fmt.Print("SCOPE RESOURCE MAP ", Id_Scope)
-		
 	}
-	fmt.Println("\nONE DONE \n")
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	wg.Add(1)
-	go parseBreakpointData(ctx)
+	go parseResourceDataBreakpointData(ctx)
 	return nil
 }
 
 func main() {
-	err := run(300 * time.Second)
+	err := run(30000 * time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
