@@ -96,49 +96,118 @@ func parseResourceDataBreakpointData(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	stackLogicalId := "MyStack"
+	var unnecessary_IDs = map[string]string {
+		"constructor":"constructor",
+		"__defineGetter__":"__defineGetter__",
+		"__defineSetter__":"__defineSetter__",
+		"hasOwnProperty":"hasOwnProperty",
+		"__lookupGetter__":"__lookupGetter__",
+		"__lookupSetter__":"__lookupSetter__",
+		"isPrototypeOf":"isPrototypeOf",
+		"propertyIsEnumerable":"propertyIsEnumerable",
+		"toString":"toString",
+		"valueOf":"valueOf",
+		"__proto__":"__proto__",
+	}
 	fmt.Println(ev.Reason)
-
+	var logicalIds map[string]string 
 	if ev.Reason == "other"{
 		for _,callFrame := range ev.CallFrames{
-			// fmt.Print(callFrame.URL)
-			if callFrame.FunctionName != ""{
-				fmt.Print("\nFUNCTION NAME ",callFrame.FunctionName)
-				// accessing all the scopes 
-				for _,scope := range callFrame.ScopeChain{
-					z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scope.Object.ObjectID})
-					if err != nil {
-						fmt.Print("Error in getting callstack detials")
-					}
-					fmt.Print("\nlength of z",len(z.Result))
-					fmt.Print("\nZ internal Props ",z.InternalProperties)
-					fmt.Print("\nZ private Props ",z.PrivateProperties)
-					for ind,data := range z.Result{
-						fmt.Print("\nDATA FOR INDEX ",ind)
-						fmt.Print("\nDATA = ",data)
-						fmt.Print("\n Data.Value =",data.Value)
-					}
+			if callFrame.FunctionName == "synth"{
+				fmt.Print("Functionname ",callFrame.FunctionName)
+				if &callFrame.This.Description != nil {
+					fmt.Print("\nTHIS ID ,",*callFrame.This.Description)
+				}
+
+				//accessing "this" object/instance  of the callStack
+				appData, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.This.ObjectID})
+				if err != nil {
+					fmt.Print("Error in getting callstack detials")
+				}
+				// iterating over all the objects present in the this object
+				for _, data := range appData.Result{
+					// if &data.Value != nil && data.Value != nil &&  data.Value.ClassName != nil{
+						if data.Name == "node" {
+							fmt.Print("\nDATA INSIDE NODE ")
+							nodeData,err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *data.Value.ObjectID})
+							if err != nil {
+								fmt.Print("ERROR in 1 level deep going")
+							}
+							fmt.Print("\n getting data inside node ")
+							// Iterating all the objects inside node
+							for _,insideNode := range nodeData.Result{
+								// if &insideNode.Value != nil && insideNode.Value != nil &&  insideNode.Value.ClassName != nil{
+									if insideNode.Name == "_children"{
+										fmt.Print("\n Found children inside node ...\n")
+										childrenData,err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *insideNode.Value.ObjectID})
+										if err != nil{
+											fmt.Print("Error in getting children object")
+										}
+										for _,insideChildren := range childrenData.Result{
+											if insideChildren.Name == stackLogicalId{
+												fmt.Print("\n FOUND MYSTACK ",insideChildren.Value)
+												stackData,err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *insideChildren.Value.ObjectID})
+												if err != nil {
+													fmt.Print("Error in Getting stackObject inside children ... ")
+												}
+												// fmt.Print("\n ENTIRE STACK DATA ",stackData)
+												for _,insideStack := range stackData.Result{
+													fmt.Print("\n Inside stack now ...")
+													if insideStack.Name == "_logicalIds"{
+														fmt.Print("\n found logicalID for ",insideChildren.Name)
+														// fmt.Print("\n PRINTING insideStack NOw",insideStack)
+														logicalIdsObject,err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *insideStack.Value.ObjectID})
+														if err != nil{
+															fmt.Print("\n Error in getting logicalIDs object")
+											
+														}
+														// fmt.Print("\n  logical ID object  ",logicalIdsObject.Result)
+														for _,logicalIdData := range logicalIdsObject.Result{
+															if logicalIdData.Name == "reverse"{
+																insideLogicalId,_ :=  client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *logicalIdData.Value.ObjectID})
+																
+																fmt.Print("\n Inside logicalID object ")
+
+																if len(insideLogicalId.Result)>=11{
+																	for lIdIndex,lId := range insideLogicalId.Result{
+																		fmt.Print("\n entire object at index ",lIdIndex," \narray of LIds ",lId.Name)
+																		_,ok := unnecessary_IDs[lId.Name]
+
+																		if !ok{
+																			fmt.Print("\n found new logicalID writing it in map of logicalID")
+																			// logicalIds[lId.Name]= lId.Name
+																			fmt.Print("\n logical ID var is = ",logicalIds[lId.Name])
+																		}
+																	} 
+																	
+
+																}
+																// client.Debugger.Disable(ctx)
+																
+																// answer := logicalIdData
+																// fmt.Print("\nFinal answer ",answer,"\n Value of ",answer.Value)
+																// logicalIds = append(logicalIds, answer.Name)
+															}
+														}
+													}
+													
+												}
+
+											}
+										}
+										
+									}
+								// }
+							}
+						}
+					// } 
 				}
 				
-			}else if callFrame.FunctionName == "synth"{
-				fmt.Print("Functionname ",callFrame.FunctionName)
-				z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
-					if err != nil {
-						fmt.Print("Error in getting callstack detials")
-					}
-					fmt.Print("\nlength of z",len(z.Result))
-					fmt.Print("\nZ internal Props ",z.InternalProperties)
-					fmt.Print("\nZ private Props ",z.PrivateProperties)
-					for ind,data := range z.Result{
-						fmt.Print("\nDATA FOR INDEX ",ind)
-						fmt.Print("\nDATA = ",data)
-						fmt.Print("\n Data.Value =",data.Value)
-					}
-				
-			}else{
-				break
 			}
 		}
 	}
+	// fmt.Print("\n var logical ID ",logicalIds)
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	wg.Add(1)
 	go parseResourceDataBreakpointData(ctx)
