@@ -22,6 +22,7 @@ import (
 var client *cdp.Client
 var pausedClient debugger.PausedClient
 var wg sync.WaitGroup
+var parDir string
 
 func run(timeout time.Duration) error {
 	// ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -52,7 +53,7 @@ func run(timeout time.Duration) error {
 	}
 
 	curDir, _ := os.Getwd()
-	parDir := filepath.Dir(curDir)
+	parDir = filepath.Dir(curDir)
 	urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
 	columnNumber := 8
 	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
@@ -86,8 +87,8 @@ func parseBreakpointData(ctx context.Context) error {
 
 	for _, callFrame := range ev.CallFrames {
 		fmt.Println(callFrame.URL)
-		stackFile := "file:///home/yk/TI/cloudfix-linter/development/cdk-dbg/my-project2/lib/my-project2-stack.ts"
-		mainFile := "file:///home/yk/TI/cloudfix-linter/development/cdk-dbg/my-project2/bin/my-project2.ts"
+		stackFile := "file://" + parDir + "/my-project2/lib/my-project2-stack.ts"
+		mainFile := "file://" + parDir + "/my-project2/bin/my-project2.ts"
 		var src *debugger.GetScriptSourceReply
 		if callFrame.URL == stackFile || callFrame.URL == mainFile {
 			scriptId := callFrame.Location.ScriptID
