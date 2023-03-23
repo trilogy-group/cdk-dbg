@@ -1,6 +1,9 @@
-import { Stack, StackProps } from 'aws-cdk-lib';
+import { Stack, StackProps, Duration } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { aws_s3 as s3 } from 'aws-cdk-lib';
+import { EventbridgeToStepfunctions, EventbridgeToStepfunctionsProps } from '@aws-solutions-constructs/aws-eventbridge-stepfunctions';
+import * as stepfunctions from 'aws-cdk-lib/aws-stepfunctions';
+import * as events from 'aws-cdk-lib/aws-events';
 
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
@@ -16,6 +19,16 @@ export class MyProject2Stack extends Stack {
 
     const PBucket = new s3.Bucket(this,"bucket_created_in_P")
     console.log("IN STACK DEC")
+    const startState = new stepfunctions.Pass(this, 'StartState');
+
+    new EventbridgeToStepfunctions(this, 'test-eventbridge-stepfunctions-stack', {
+      stateMachineProps: {
+        definition: startState
+      },
+      eventRuleProps: {
+        schedule: events.Schedule.rate(Duration.minutes(5))
+      }
+    });
 
     // The code that defines your stack goes here
 

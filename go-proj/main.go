@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -23,6 +24,12 @@ var client *cdp.Client
 var pausedClient debugger.PausedClient
 var wg sync.WaitGroup
 var parDir string
+//var resourceIds []string
+var constructId string
+//var stackLocations []string
+//var mainLocations []string
+var resourceIdToLocation = make(map[string]string)
+var objectCount int = 0
 
 func run(timeout time.Duration) error {
 	// ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -74,8 +81,22 @@ func run(timeout time.Duration) error {
 	go parseBreakpointData(ctx)
 
 	wg.Wait()
+	
+	//getResourceToLocation()
 	return nil
 }
+
+// func getResourceToLocation() {
+// 	if len(resourceIds) > 0 && len(mainLocations) > 0 {
+// 		resourceIdToLocation[resourceIds[0]] = mainLocations[0]
+// 	}
+// 	for idx, id := range resourceIds {
+// 		if idx > 0 && idx < len(stackLocations){
+// 			resourceIdToLocation[id] = stackLocations[idx]
+// 		}
+// 	}
+// 	fmt.Println(resourceIdToLocation)
+// }
 
 func parseBreakpointData(ctx context.Context) error {
 	defer wg.Done()
@@ -90,6 +111,15 @@ func parseBreakpointData(ctx context.Context) error {
 		stackFile := "file://" + parDir + "/my-project2/lib/my-project2-stack.ts"
 		mainFile := "file://" + parDir + "/my-project2/bin/my-project2.ts"
 		var src *debugger.GetScriptSourceReply
+		z, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.ScopeChain[0].Object.ObjectID})
+		if callFrame.FunctionName == "Construct" && len(z.Result) > 1 {
+			fmt.Println("ID")
+			json.Unmarshal(z.Result[1].Value.Value, &constructId)
+			// fmt.Println(constructId)
+			// if len(constructId) > 0 && constructId != "Tree" {
+			// 	resourceIds = append(resourceIds, constructId)
+			// }
+		}
 		if callFrame.URL == stackFile || callFrame.URL == mainFile {
 			scriptId := callFrame.Location.ScriptID
 			src, err = client.Debugger.GetScriptSource(ctx, &debugger.GetScriptSourceArgs{ScriptID: scriptId})
@@ -115,8 +145,22 @@ func parseBreakpointData(ctx context.Context) error {
 			// although their doc mentions that both line and column are 0 indexed
 			// doc: https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit
 			genline, gencol := callFrame.Location.LineNumber+1, *callFrame.Location.ColumnNumber
+			fmt.Println("Variables of interest")
 			file, fn, sourceline, sourcecol, ok := smap.Source(genline, gencol)
 			fmt.Println(file, fn, sourceline, sourcecol, ok)
+			_, isPresent := resourceIdToLocation[constructId]
+			if len(constructId) > 0 && constructId != "Tree" && !isPresent {
+				if callFrame.URL == mainFile && objectCount == 0 {
+					//mainLocations = append(mainLocations, file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1))
+					resourceIdToLocation[constructId] = file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1)
+					objectCount++
+				} else if callFrame.URL == stackFile && objectCount > 0{
+					//stackLocations = append(stackLocations, file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1))
+					resourceIdToLocation[constructId] = file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1)
+					objectCount++
+				}
+			}
+			
 			// original use's source code
 			cnt := smap.SourceContent(strings.Replace(mapURL, "file://", "", -1))
 			fmt.Println(cnt)
@@ -140,6 +184,7 @@ func parseBreakpointData(ctx context.Context) error {
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	wg.Add(1)
 	go parseBreakpointData(ctx)
+	fmt.Println(resourceIdToLocation)
 	return nil
 }
 

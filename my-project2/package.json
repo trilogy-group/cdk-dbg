@@ -21,10 +21,11 @@
     "typescript": "~3.9.7"
   },
   "dependencies": {
+    "@aws-solutions-constructs/aws-eventbridge-stepfunctions": "^2.34.0",
     "@aws-solutions-constructs/aws-sqs-lambda": "^2.33.0",
     "aws-cdk-lib": "2.34.2",
+    "chrome-remote-interface": "^0.32.1",
     "constructs": "^10.0.0",
-    "source-map-support": "^0.5.21",
-    "chrome-remote-interface": "^0.32.1"
+    "source-map-support": "^0.5.21"
   }
 }
