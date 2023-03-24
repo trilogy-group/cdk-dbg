@@ -20,6 +20,11 @@ import (
 	"github.com/mafredri/cdp/rpcc"
 )
 
+type ResourceLocation struct {
+	filePath string
+	lineNumber int
+	colNumber int
+}
 var client *cdp.Client
 var pausedClient debugger.PausedClient
 var wg sync.WaitGroup
@@ -28,8 +33,9 @@ var parDir string
 var constructId string
 //var stackLocations []string
 //var mainLocations []string
-var resourceIdToLocation = make(map[string]string)
+var resourceIdToLocation = make(map[string]ResourceLocation)
 var objectCount int = 0
+
 
 func run(timeout time.Duration) error {
 	// ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -63,6 +69,11 @@ func run(timeout time.Duration) error {
 	parDir = filepath.Dir(curDir)
 	urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
 	columnNumber := 8
+	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
+		URLRegex:     &urlRegex,
+		LineNumber:   129,
+		ColumnNumber: &columnNumber,
+	})
 	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
 		URLRegex:     &urlRegex,
 		LineNumber:   367,
@@ -150,13 +161,12 @@ func parseBreakpointData(ctx context.Context) error {
 			fmt.Println(file, fn, sourceline, sourcecol, ok)
 			_, isPresent := resourceIdToLocation[constructId]
 			if len(constructId) > 0 && constructId != "Tree" && !isPresent {
+				var x = ResourceLocation{file, sourceline, sourcecol + 1}
 				if callFrame.URL == mainFile && objectCount == 0 {
-					//mainLocations = append(mainLocations, file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1))
-					resourceIdToLocation[constructId] = file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1)
+					resourceIdToLocation[constructId] = x
 					objectCount++
 				} else if callFrame.URL == stackFile && objectCount > 0{
-					//stackLocations = append(stackLocations, file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1))
-					resourceIdToLocation[constructId] = file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1)
+					resourceIdToLocation[constructId] = x
 					objectCount++
 				}
 			}
