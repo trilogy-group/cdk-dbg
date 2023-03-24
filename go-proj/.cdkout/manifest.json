@@ -1,0 +1,203 @@
+{
+    "version": "20.0.0",
+    "artifacts": {
+        "Tree": {
+            "type": "cdk:tree",
+            "properties": {
+                "file": "tree.json"
+            }
+        },
+        "CfDemoStack.assets": {
+            "type": "cdk:asset-manifest",
+            "properties": {
+                "file": "CfDemoStack.assets.json",
+                "requiresBootstrapStackVersion": 6,
+                "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+            }
+        },
+        "CfDemoStack": {
+            "type": "aws:cloudformation:stack",
+            "environment": "aws://unknown-account/unknown-region",
+            "properties": {
+                "templateFile": "CfDemoStack.template.json",
+                "tags": {
+                    "Owner": "ankush.pandey@trilogy.com",
+                    "Project": "cloudfix-linter-cdk"
+                },
+                "validateOnSynth": false,
+                "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
+                "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
+                "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/be5fdc4411e8e7d0fe7f50f7e235d839541177c999ab9db3df2402d2e9a0ae1d.json",
+                "requiresBootstrapStackVersion": 6,
+                "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+                "additionalDependencies": [
+                    "CfDemoStack.assets"
+                ],
+                "lookupRole": {
+                    "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-${AWS::Region}",
+                    "requiresBootstrapStackVersion": 8,
+                    "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+                }
+            },
+            "dependencies": [
+                "CfDemoStack.assets"
+            ],
+            "metadata": {
+                "/CfDemoStack": [
+                    {
+                        "type": "aws:cdk:stack-tags",
+                        "data": [
+                            {
+                                "Key": "Owner",
+                                "Value": "ankush.pandey@trilogy.com"
+                            },
+                            {
+                                "Key": "Project",
+                                "Value": "cloudfix-linter-cdk"
+                            }
+                        ]
+                    }
+                ],
+                "/CfDemoStack/cloudfixlinter-cf/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixlintercf1D30B82C"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-DataVolume/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfDataVolumeB7589DA9"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-AppServer/InstanceSecurityGroup/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfAppServerInstanceSecurityGroup90F84EBB"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-AppServer/InstanceRole/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfAppServerInstanceRoleF9F24B94"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-AppServer/InstanceProfile": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfAppServerInstanceProfileBF4AA31E"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-AppServer/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfAppServerCA2B5C92"
+                    }
+                ],
+                "/CfDemoStack/SsmParameterValue:--aws--service--ami-amazon-linux-latest--amzn2-ami-hvm-x86_64-gp2:C96584B6-F00A-464E-AD19-53AFF4B05118.Parameter": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amihvmx8664gp2C96584B6F00A464EAD1953AFF4B05118Parameter"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-instance-appserver/InstanceSecurityGroup/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfinstanceappserverInstanceSecurityGroup0A7C720F"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-instance-appserver/InstanceRole/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfinstanceappserverInstanceRole8E6E2D49"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-instance-appserver/InstanceProfile": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfinstanceappserverInstanceProfile2F003956"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-instance-appserver/AmiMap": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfinstanceappserverAmiMap4C1EB744"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-instance-appserver/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfinstanceappserver6748D195"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-Natgateway": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfNatgateway"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-MyVpcEndpoint/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfMyVpcEndpoint2B3B0E98"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-s3-1/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfs318F2DAC6D"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-s3-2/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfs32BA22A389"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-MyFileSystem/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfMyFileSystem506E3CC5"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-MyFileSystem/EfsSecurityGroup/Resource": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfMyFileSystemEfsSecurityGroup20E8E2D7"
+                    }
+                ],
+                "/CfDemoStack/cloudfix-cf-MyFileSystem/EfsMountTarget1": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "cloudfixcfMyFileSystemEfsMountTarget15A64BFC9"
+                    }
+                ],
+                "/CfDemoStack/CDKMetadata/Default": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "CDKMetadata"
+                    }
+                ],
+                "/CfDemoStack/CDKMetadata/Condition": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "CDKMetadataAvailable"
+                    }
+                ],
+                "/CfDemoStack/BootstrapVersion": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "BootstrapVersion"
+                    }
+                ],
+                "/CfDemoStack/CheckBootstrapVersion": [
+                    {
+                        "type": "aws:cdk:logicalId",
+                        "data": "CheckBootstrapVersion"
+                    }
+                ]
+            },
+            "displayName": "CfDemoStack"
+        }
+    }
+}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+
+	// "log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,6 +19,7 @@ import (
 	// "github.com/mafredri/cdp/protocol/runtime"
 	"github.com/mafredri/cdp/rpcc"
 )
+
 
 var client *cdp.Client
 var pausedClient debugger.PausedClient
@@ -49,12 +52,12 @@ func run(timeout time.Duration) error {
 		return err
 	}
 	defer conn.Close() // Leaving connections open will leak memory.
-
 	client = cdp.NewClient(conn)
-
+	
 	// Enable debugging features
 	_, err = client.Debugger.Enable(ctx, &debugger.EnableArgs{})
 	if err != nil {
+		fmt.Print("\n Error while enbling debugger ",err)
 		return err
 	}
 
@@ -85,11 +88,10 @@ func run(timeout time.Duration) error {
 		LineNumber:   129,
 		ColumnNumber: &columnNumber,
 	})
-
+	
 	pausedClient, err = client.Debugger.Paused(ctx)
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	err = client.Runtime.RunIfWaitingForDebugger(ctx)
-
 	if err != nil {
 		return err
 	}
@@ -97,7 +99,7 @@ func run(timeout time.Duration) error {
 	IdConditionCount = 0
 
 	wg.Add(1)
-	go parseResourceDataBreakpointData(ctx)
+	go parseResourceDataBreakpointData(ctx,conn)
 
 	wg.Wait()
 	return nil
@@ -226,7 +228,7 @@ func getChildrenData(dataObj *runtime.RemoteObjectID, ctx context.Context) {
 	}
 }
 
-func parseResourceDataBreakpointData(ctx context.Context) error {
+func parseResourceDataBreakpointData(ctx context.Context , conn *rpcc.Conn) error {
 	defer wg.Done()
 	ev, err := pausedClient.Recv()
 	if err != nil {
@@ -260,14 +262,17 @@ func parseResourceDataBreakpointData(ctx context.Context) error {
 				if Node.Result[idIndex].Value.String() == "\"\"" && (len(stackIDs) != 0) && IdConditionCount >= 3 {
 					fmt.Print("\n fetching children data for ID = ", Node.Result[idIndex].Value.String())
 					getChildrenData(Node.Result[childrenIndex].Value.ObjectID, ctx)
-
+				
+				// Fetches All the stackIds
 				} else if Node.Result[idIndex].Value.String() == "\"\"" && (len(stackIDs) == 0) && IdConditionCount >= 3 { // Getting StackIDs when id = ""
 					objectCount = setDefaultObjects(Node.Result[childrenIndex].Value.ObjectID, ctx)
 					fmt.Print("\n collected StackIDS ", stackIDs)
 
 				} else if Node.Result[idIndex].Value.String() == "\"BootstrapVersion\"" {
-					client.Debugger.Disable(ctx)
+					fmt.Print("\n BOOTSTARP VERSION IS FOUND \n", Node.Result[idIndex].Value.String())
+					conn.Close();
 				}
+				fmt.Print("\n ID is ", Node.Result[idIndex].Value.String())
 
 			}
 		}
@@ -280,11 +285,12 @@ func parseResourceDataBreakpointData(ctx context.Context) error {
 
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	wg.Add(1)
-	go parseResourceDataBreakpointData(ctx)
+	go parseResourceDataBreakpointData(ctx,conn)
 	return nil
 }
 
 func main() {
+	// fmt.Print(PrepareMappings())
 	err := run(30000 * time.Second)
 	if err != nil {
 		log.Fatal(err)
