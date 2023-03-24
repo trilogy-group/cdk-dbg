@@ -116,6 +116,7 @@ func PrepareMappings() error {
 		logger.DevLogger().Error("unable to read manifest.json in .cdkout file in workspacedir : :", wrkspaceDir, "Error: ", err)
 		return errors.New("CANNOTREADMANIFEST")
 	}
+	
 	stacksData,LogicalIdsToPath,err := getStacksDataFromJson(byteManifest)
 	fmt.Print("\n StackDATa",stacksData)
 	fmt.Print("\n LogicalIdToPat ",LogicalIdsToPath)

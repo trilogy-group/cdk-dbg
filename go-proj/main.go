@@ -290,9 +290,10 @@ func parseResourceDataBreakpointData(ctx context.Context , conn *rpcc.Conn) erro
 }
 
 func main() {
-	// fmt.Print(PrepareMappings())
-	err := run(30000 * time.Second)
-	if err != nil {
-		log.Fatal(err)
-	}
+	fmt.Print(PrepareMappings())
+	log.Fatal("YES")
+	// err := run(30000 * time.Second)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 }
