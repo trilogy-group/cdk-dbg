@@ -91,6 +91,9 @@ func run(timeout time.Duration) error {
 	
 	pausedClient, err = client.Debugger.Paused(ctx)
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
+
+	//used to continue program execution if the program is currently paused waiting for a debugger to attach.
+	//If the program is not currently waiting for a debugger, this method will simply return immediately without doing anything.
 	err = client.Runtime.RunIfWaitingForDebugger(ctx)
 	if err != nil {
 		return err
@@ -230,6 +233,7 @@ func getChildrenData(dataObj *runtime.RemoteObjectID, ctx context.Context) {
 
 func parseResourceDataBreakpointData(ctx context.Context , conn *rpcc.Conn) error {
 	defer wg.Done()
+	// getting current callstack and vars from the debugger process
 	ev, err := pausedClient.Recv()
 	if err != nil {
 		return err
