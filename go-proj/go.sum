@@ -47,6 +47,8 @@ github.com/klauspost/compress v1.10.3/go.mod h1:aoV0uJVorq1K+umq18yTdKaF57EivdYs
 github.com/leodido/go-urn v1.2.0/go.mod h1:+8+nEpDfqqsY+g338gtMEUOtuK+4dEMhiQEgxpxOKII=
 github.com/mafredri/cdp v0.33.0 h1:McuQjNe0DyctTUxt8zY6jGTlpPoy2gciqxtvKhz0XPM=
 github.com/mafredri/cdp v0.33.0/go.mod h1:Dbsh7eY/zhQlsddEDWzZGOztv9Jf2gzKq47M7a2P3C4=
+github.com/mafredri/cdp v0.34.0 h1:kC8LFc1IJcjexESrt6U+MkqLtbwLV+WQ9hgcn1hntc4=
+github.com/mafredri/cdp v0.34.0/go.mod h1:Dbsh7eY/zhQlsddEDWzZGOztv9Jf2gzKq47M7a2P3C4=
 github.com/mafredri/go-lint v0.0.0-20180911205320-920981dfc79e/go.mod h1:k/zdyxI3q6dup24o8xpYjJKTCf2F7rfxLp6w/efTiWs=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=

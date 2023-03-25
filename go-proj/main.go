@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
-	"encoding/json"
 	"sync"
 	"time"
 
@@ -29,8 +29,10 @@ var client *cdp.Client
 var pausedClient debugger.PausedClient
 var wg sync.WaitGroup
 var parDir string
+
 //var resourceIds []string
 var constructId string
+
 //var stackLocations []string
 //var mainLocations []string
 var resourceIdToLocation = make(map[string]ResourceLocation)
@@ -92,7 +94,7 @@ func run(timeout time.Duration) error {
 	go parseBreakpointData(ctx)
 
 	wg.Wait()
-	
+
 	//getResourceToLocation()
 	return nil
 }
@@ -161,16 +163,18 @@ func parseBreakpointData(ctx context.Context) error {
 			fmt.Println(file, fn, sourceline, sourcecol, ok)
 			_, isPresent := resourceIdToLocation[constructId]
 			if len(constructId) > 0 && constructId != "Tree" && !isPresent {
-				var x = ResourceLocation{file, sourceline, sourcecol + 1}
+				// var x = ResourceLocation{file, sourceline, sourcecol + 1}
 				if callFrame.URL == mainFile && objectCount == 0 {
-					resourceIdToLocation[constructId] = x
+					//mainLocations = append(mainLocations, file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1))
+					resourceIdToLocation[constructId] = file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol+1)
 					objectCount++
-				} else if callFrame.URL == stackFile && objectCount > 0{
-					resourceIdToLocation[constructId] = x
+				} else if callFrame.URL == stackFile && objectCount > 0 {
+					//stackLocations = append(stackLocations, file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol + 1))
+					resourceIdToLocation[constructId] = file + " " + fmt.Sprint(sourceline) + ":" + fmt.Sprint(sourcecol+1)
 					objectCount++
 				}
 			}
-			
+
 			// original use's source code
 			cnt := smap.SourceContent(strings.Replace(mapURL, "file://", "", -1))
 			fmt.Println(cnt)
