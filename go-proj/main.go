@@ -15,8 +15,6 @@ import (
 	"github.com/mafredri/cdp/devtool"
 	"github.com/mafredri/cdp/protocol/debugger"
 	"github.com/mafredri/cdp/protocol/runtime"
-
-	// "github.com/mafredri/cdp/protocol/runtime"
 	"github.com/mafredri/cdp/rpcc"
 )
 
@@ -24,15 +22,11 @@ import (
 var client *cdp.Client
 var pausedClient debugger.PausedClient
 var wg sync.WaitGroup
-var defaultObjects map[string]string
-var objectCount int = 0
-var stackIDs map[string]string
 var stackIdToResourceIds map[string][]string // stackID to resourcesID
-var IdConditionCount int
-var stackToLogicalIds map[string][]string // stackID to logicalIds
+var stackToLogicalIds map[string][]string  // stackID to logicalIds
 var resourceIdToType map[string]string
-var stackIdToClassname map[string]string
-
+var stackToResourceToPath map[string] map[string ] string
+var resourceIdToPath map[string] string 
 func run(timeout time.Duration) error {
 	// ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -81,11 +75,18 @@ func run(timeout time.Duration) error {
 	// })
 
 	// use this for Tapping get children
+	// urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
+	// columnNumber := 8
+	// client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
+	// 	URLRegex:     &urlRegex,
+	// 	LineNumber:   129,
+	// 	ColumnNumber: &columnNumber,
+	// })
 	urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
 	columnNumber := 8
 	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
 		URLRegex:     &urlRegex,
-		LineNumber:   129,
+		LineNumber:   367,
 		ColumnNumber: &columnNumber,
 	})
 	
@@ -99,35 +100,17 @@ func run(timeout time.Duration) error {
 		return err
 	}
 
-	IdConditionCount = 0
 
 	wg.Add(1)
 	go parseResourceDataBreakpointData(ctx,conn)
 
+	
 	wg.Wait()
+	
+
 	return nil
 }
 
-func setDefaultObjects(dataObj *runtime.RemoteObjectID, ctx context.Context) int {
-	defaultObjectsLocal := make(map[string]string)
-
-	data, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *dataObj})
-	objectCount = 0
-	stackIDs = make(map[string]string)
-	for _, dataObject := range data.Result {
-		if *dataObject.IsOwn == true && dataObject.Name != "Tree" {
-			fmt.Print("\n NAme ", dataObject.Name, " is stackNAme")
-			stackIDs["\""+dataObject.Name+"\""] = "\"" + dataObject.Name + "\""
-		} else {
-			defaultObjectsLocal[dataObject.Name] = dataObject.Name
-			fmt.Print("\n NAme ", dataObject.Name, " is Default")
-			objectCount++
-		}
-	}
-	defaultObjects = defaultObjectsLocal
-	return objectCount
-
-}
 func getLogicalIds(dataObj *runtime.RemoteObjectID, ctx context.Context) []string {
 	var logicalIds []string
 	LogicalIdObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *dataObj})
@@ -135,7 +118,7 @@ func getLogicalIds(dataObj *runtime.RemoteObjectID, ctx context.Context) []strin
 		if logicalIdObject.Name == "reverse" {
 			reverseObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *logicalIdObject.Value.ObjectID})
 			for _, reverseObject := range reverseObjects.Result {
-				if *reverseObject.IsOwn == true && reverseObject.Name != "CDKMetadata" {
+				if *reverseObject.IsOwn && reverseObject.Name != "CDKMetadata" {
 					logicalIds = append(logicalIds, reverseObject.Name)
 				}
 			}
@@ -144,26 +127,45 @@ func getLogicalIds(dataObj *runtime.RemoteObjectID, ctx context.Context) []strin
 	return logicalIds
 }
 
-func getResourceType(dataObj *runtime.RemoteObjectID, ctx context.Context) string {
-	resourceObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *dataObj})
+func GetCdkPath(CfnOptionsObjectId *runtime.RemoteObjectID,ctx context.Context) string {
+	cfnOptionsData,errCfn := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *CfnOptionsObjectId})
+	if errCfn != nil {
+		fmt.Print("\n Not able to get CfnOptions from callstackData")
+	}
+	for _,insideCfnOptionData := range cfnOptionsData.Result{
+		if insideCfnOptionData.Name == "metadata"{
+			metaData, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *insideCfnOptionData.Value.ObjectID})
+			for _,insideMetaData := range metaData.Result{
+				if insideMetaData.Name == "aws:cdk:path"{
+					return insideMetaData.Value.String()
+				}
+			}
+		}
+	}
+	return ""
+}
 
+func getResourceTypeAndPath(dataObj *runtime.RemoteObjectID, ctx context.Context) (string,string) {
+	resourceObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *dataObj})
+	resourceType := ""
+	AwsCdkPath := ""
 	for _, resourceObject := range resourceObjects.Result {
 		if resourceObject.Name == "_resource" {
 			cfnResourceObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *resourceObject.Value.ObjectID})
 			for _, cfnResourceObject := range cfnResourceObjects.Result {
 				if cfnResourceObject.Name == "cfnResourceType" {
-					return cfnResourceObject.Value.String()
+					resourceType = cfnResourceObject.Value.String()
 				}
-				// we can get path also from here by
-				if cfnResourceObject.Name == "cfnProperties" {
+				if cfnResourceObject.Name == "cfnOptions" {
 					// get cdkpath
+					AwsCdkPath = GetCdkPath(cfnResourceObject.Value.ObjectID,ctx)
 					//its inside cfnOptions -> metadata -> aws:cdk:path
 				}
 			}
+			return resourceType,AwsCdkPath
 		}
 	}
-	fmt.Print("\n no type found ")
-	return ""
+	return "",""
 }
 
 func getResources(dataObj *runtime.RemoteObjectID, ctx context.Context) {
@@ -174,10 +176,17 @@ func getResources(dataObj *runtime.RemoteObjectID, ctx context.Context) {
 		if nodeObject.Name == "_children" {
 			childrenObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *nodeObject.Value.ObjectID})
 			for _, childrenObject := range childrenObjects.Result {
-				if *childrenObject.IsOwn == true && childrenObject.Name != "CDKMetadata" {
+				if *childrenObject.IsOwn && childrenObject.Name != "CDKMetadata" {
+					// fmt.Print("\n ResourceID being considered is ",childrenObject.Name)
 					resourceObjectId := childrenObject.Value.ObjectID
-					resourceType := getResourceType(resourceObjectId, ctx)
-					resourceIdToType = make(map[string]string)
+					resourceType,AwsCdkPath := getResourceTypeAndPath(resourceObjectId, ctx)
+					if resourceIdToType == nil {
+						resourceIdToType = make(map[string]string)
+					}
+					if resourceIdToPath == nil {
+						resourceIdToPath = make(map[string]string)
+					}
+					resourceIdToPath[childrenObject.Name] = AwsCdkPath
 					resourceIdToType[childrenObject.Name] = resourceType
 					resourceIds = append(resourceIds, childrenObject.Name)
 				}
@@ -187,9 +196,14 @@ func getResources(dataObj *runtime.RemoteObjectID, ctx context.Context) {
 			idIndex = index
 		}
 	}
-	stackIdToResourceIds = make(map[string][]string)
+	if stackIdToResourceIds == nil {
+		stackIdToResourceIds = make(map[string][]string)
+	}
+	if stackToResourceToPath == nil {
+		stackToResourceToPath = make(map[string] map[string] string)
+	}	
+	stackToResourceToPath[nodeObjects.Result[idIndex].Value.String()] = resourceIdToPath
 	stackIdToResourceIds[nodeObjects.Result[idIndex].Value.String()] = resourceIds
-	fmt.Print("classname of stack is  ")
 }
 
 func getStackData(dataObj *runtime.RemoteObjectID, ctx context.Context) {
@@ -204,31 +218,14 @@ func getStackData(dataObj *runtime.RemoteObjectID, ctx context.Context) {
 			nodeObjectID := stackDataObject.Value.ObjectID
 			getResources(nodeObjectID, ctx)
 		} else if stackDataObject.Name == "_stackName" {
-			stackToLogicalIds = make(map[string][]string)
+			if stackToLogicalIds == nil {
+				stackToLogicalIds = make(map[string][]string)
+			}
+			
 			stackName = stackDataObject.Value.String()
 		}
 	}
 	stackToLogicalIds[stackName] = logicalIds
-}
-
-func getChildrenData(dataObj *runtime.RemoteObjectID, ctx context.Context) {
-	dataObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *dataObj})
-	for _, dataObject := range dataObjects.Result {
-		_, inDefaultObject := defaultObjects[dataObject.Name]
-		_, inStackIds := stackIDs["\""+dataObject.Name+"\""]
-		// stackID has "" at start and end so must add those for checking
-
-		// stackId is present, its not default object and isOwn
-		if !inDefaultObject && *dataObject.IsOwn == true && inStackIds {
-			fmt.Print("\n object name being checked ", dataObject.Name)
-			fmt.Print("\n ClassNAme of stacks = ", *dataObject.Value.ClassName)
-			stackIdToClassname = make(map[string]string)
-			stackIdToClassname[dataObject.Name] = *dataObject.Value.ClassName
-			stackObject := dataObject.Value.ObjectID
-			fmt.Print("\n stackResource maps ", stackIdToResourceIds)
-			getStackData(stackObject, ctx)
-		}
-	}
 }
 
 func parseResourceDataBreakpointData(ctx context.Context , conn *rpcc.Conn) error {
@@ -239,54 +236,52 @@ func parseResourceDataBreakpointData(ctx context.Context , conn *rpcc.Conn) erro
 		return err
 	}
 
-	fmt.Println(ev.Reason)
-	if ev.Reason == "other" {
-		for _, callFrame := range ev.CallFrames {
-			if callFrame.FunctionName == "get children" {
-				Node, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.This.ObjectID})
-				if err != nil {
-					fmt.Print("\n Error in accessing the this Object in Node")
-				}
-				var idIndex int
-				var childrenIndex int
-				for index, insideNode := range Node.Result {
-					if insideNode.Name == "id" && insideNode.Value != nil {
-						if insideNode.Value.String() == "\"Condition\"" {
-							IdConditionCount++
+	// extracting 
+	//1. StackId-ConstructIDs-CDKPath
+	//2. StackId-LogicalIDs
+	// var stackIds []string
+	if ev.Reason == "other"{
+		for _, callFrame := range ev.CallFrames{
+			if callFrame.FunctionName == "Construct"{
+				for _,scopeChain := range callFrame.ScopeChain{
+					if scopeChain.Type == "local"{
+						localScope,_ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scopeChain.Object.ObjectID})
+						// For storing the index of Id and Scope in localScopeResult array
+						idIndex:=-1
+						scopeIndex :=-1  
+						for index,localScopeData := range localScope.Result{
+							if localScopeData.Name == "id" && localScopeData.Value.String() == "\"BootstrapVersion\""{
+									idIndex = index
+							}else if localScopeData.Name == "scope"{
+									scopeIndex = index
+							}
 						}
-						idIndex = index
-					}
-					// LogicalIDs should be present
-					if IdConditionCount >= 3 && insideNode.Name == "_children" {
+						if idIndex>=0 && scopeIndex>=0 {
+							ScopeDataObjectId := localScope.Result[scopeIndex].Value.ObjectID
+							getStackData(ScopeDataObjectId,ctx)	
+							fmt.Print("\n stackToLogicalIds ", stackToLogicalIds)
+							fmt.Print("\n resourceToType ", resourceIdToType)
+							fmt.Print("\n stackIdToresourceID ", stackIdToResourceIds)
+							fmt.Print("\n StackID -> ResourceID -> Path  ", stackToResourceToPath)
+						}
+						// For ending the client 
+						// 1. Get the list of all the stacks present 
+							// 1.a. From the time when map for location for each resource is being created
+							// 1.b  When id value is  'CDKMetadata' Keep collecting stackNames
+							// CDKMetadata is called for each stack before calling BootstrapVersion for any stack 
+						// 2. When we encounter the 'CheckBootstrapVersion' or Just after BootstrapVersion of last stack End
+						// Also For gathering 	
 
-						childrenIndex = index
+
+						// Since the Path already has ConstructID 
+						// We can match the LogicalID to its ConstructID
 					}
 				}
-				// stackID found
-				if Node.Result[idIndex].Value.String() == "\"\"" && (len(stackIDs) != 0) && IdConditionCount >= 3 {
-					fmt.Print("\n fetching children data for ID = ", Node.Result[idIndex].Value.String())
-					getChildrenData(Node.Result[childrenIndex].Value.ObjectID, ctx)
-				
-				// Fetches All the stackIds
-				} else if Node.Result[idIndex].Value.String() == "\"\"" && (len(stackIDs) == 0) && IdConditionCount >= 3 { // Getting StackIDs when id = ""
-					objectCount = setDefaultObjects(Node.Result[childrenIndex].Value.ObjectID, ctx)
-					fmt.Print("\n collected StackIDS ", stackIDs)
-
-				} else if Node.Result[idIndex].Value.String() == "\"BootstrapVersion\"" {
-					fmt.Print("\n BOOTSTARP VERSION IS FOUND \n", Node.Result[idIndex].Value.String())
-					conn.Close();
-				}
-				fmt.Print("\n ID is ", Node.Result[idIndex].Value.String())
-
 			}
 		}
 	}
-	fmt.Print("\n stackIDs", stackIDs)
-	fmt.Print("\n stackToLogicalIds ", stackToLogicalIds)
-	fmt.Print("\n resourceToType ", resourceIdToType)
-	fmt.Print("\n stackIdToresourceID ", stackIdToResourceIds)
-	fmt.Print("\n ClasstypeToResourceID ", stackIdToClassname)
-
+	
+	
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	wg.Add(1)
 	go parseResourceDataBreakpointData(ctx,conn)
@@ -294,10 +289,11 @@ func parseResourceDataBreakpointData(ctx context.Context , conn *rpcc.Conn) erro
 }
 
 func main() {
-	fmt.Print(PrepareMappings())
-	log.Fatal("YES")
-	// err := run(30000 * time.Second)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	err := run(30000 * time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
 }
+
+

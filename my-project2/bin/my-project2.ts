@@ -20,6 +20,6 @@ new MyProject2Stack(app, 'MyStack', {
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 });
-// const k = new Stack2(app, 'MyStack2',{})
+const k = new Stack2(app, 'MyStack2',{})
 console.log("SYNTH HERE OR NOT")
 
