@@ -86,6 +86,13 @@ func run(timeout time.Duration) error {
 		ColumnNumber: &columnNumber,
 	})
 
+	columnNumber = 17
+	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
+		URLRegex:     &urlRegex,
+		LineNumber:   323,
+		ColumnNumber: &columnNumber,
+	})
+
 	pausedClient, err = client.Debugger.Paused(ctx)
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	err = client.Runtime.RunIfWaitingForDebugger(ctx)
@@ -236,6 +243,33 @@ func parseResourceDataBreakpointData(ctx context.Context) error {
 	fmt.Println(ev.Reason)
 	if ev.Reason == "other" {
 		for _, callFrame := range ev.CallFrames {
+			if callFrame.FunctionName == "addChild" {
+				Node, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.This.ObjectID})
+				if err != nil {
+					fmt.Print("\n Error in accessing the this Object in Node")
+				}
+				// var idIndex int
+				// var childrenIndex int
+				for _, insideNode := range Node.Result {
+
+					if insideNode.Name == "path" && insideNode.Get != nil {
+						// z, err := client.Runtime.Evaluate(ctx, &runtime.EvaluateArgs{Expression: "this.path"})
+						z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *insideNode.Get.ObjectID})
+						fmt.Println(z, err)
+						fmt.Println(insideNode.Get)
+						evaluated, err := client.Runtime.Evaluate(ctx, &runtime.EvaluateArgs{Expression: "this"})
+						evaluatedProp, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *evaluated.Result.ObjectID})
+
+						fmt.Println(evaluatedProp, err)
+						fmt.Println(*insideNode.Get.Description)
+						y, err := client.Runtime.CallFunctionOn(ctx, &runtime.CallFunctionOnArgs{
+							FunctionDeclaration: *insideNode.Get.Description,
+							ObjectID:            callFrame.This.ObjectID,
+						})
+						fmt.Println(y, err)
+					}
+				}
+			}
 			if callFrame.FunctionName == "get children" {
 				Node, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *callFrame.This.ObjectID})
 				if err != nil {
