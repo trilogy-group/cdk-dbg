@@ -182,7 +182,7 @@ func parseBreakpointData(ctx context.Context) error {
 
 		for _, scope := range callFrame.ScopeChain {
 
-			// for viewing variables
+			// for viewing variablesFINAL MAPPINGS
 			z, err := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scope.Object.ObjectID})
 			if err != nil {
 				fmt.Println("Error: ", err)
@@ -196,7 +196,7 @@ func parseBreakpointData(ctx context.Context) error {
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	wg.Add(1)
 	go parseBreakpointData(ctx)
-	fmt.Println(resourceIdToLocation)
+	fmt.Println("FINAL MAPPINGS = ",resourceIdToLocation)
 	return nil
 }
 
