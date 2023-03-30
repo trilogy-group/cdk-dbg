@@ -5,12 +5,20 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
-            "name": "Launch go dbg file",
+            "name": "Launch main.go ",
             "type": "go",
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/go-proj/main.go"
+        },
+        {
+            "name": "Launch newBp.go ",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/go-proj/newBp.go"
         },
         {
             "type": "node",

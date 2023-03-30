@@ -1,12 +1,15 @@
 package main
 
+// to use this go file commend out the main.go file 
+// and make the kmain at 409 line to main
+
+
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	// "log"
@@ -15,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-sourcemap/sourcemap"
 	"github.com/mafredri/cdp"
 	"github.com/mafredri/cdp/devtool"
 	"github.com/mafredri/cdp/protocol/debugger"
@@ -23,14 +25,6 @@ import (
 	"github.com/mafredri/cdp/rpcc"
 	"github.com/trilogy-group/cloudfix-linter-developer/logger"
 )
-
-type ResourceLocation struct {
-	filePath   string
-	lineNumber int
-	colNumber  int
-}
-var stackFile = "/lib/"
-var mainFile = "/bin/"
 
 var client *cdp.Client
 var pausedClient debugger.PausedClient
@@ -41,8 +35,6 @@ var resourceIdToType map[string]string
 var stackToResourceToPath map[string]map[string]string
 var resourceIdToPath map[string]string
 var stackIds []string
-var parDir string
-var pathToLocation map[string][]ResourceLocation
 
 func run(timeout time.Duration) error {
 	// ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -56,6 +48,7 @@ func run(timeout time.Duration) error {
 		return err
 	}
 
+	fmt.Println("KK", pt.WebSocketDebuggerURL)
 	// Initiate a new RPC connection to the Chrome DevTools Protocol target.
 	conn, err := rpcc.DialContext(ctx, pt.WebSocketDebuggerURL)
 	if err != nil {
@@ -72,7 +65,7 @@ func run(timeout time.Duration) error {
 	}
 
 	curDir, _ := os.Getwd()
-	parDir = filepath.Dir(curDir)
+	parDir := filepath.Dir(curDir)
 
 	// urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
 	// columnNumber := 9
@@ -98,14 +91,21 @@ func run(timeout time.Duration) error {
 	// 	LineNumber:   129,
 	// 	ColumnNumber: &columnNumber,
 	// })
-	urlRegex := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
-	columnNumber := 17
+
+	urlRegex := "^.*" + parDir + "/my-project2/node_modules/aws-cdk-lib/core/lib/stack-synthesizers/_shared.js$"
+	columnNumber := 921
 	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
 		URLRegex:     &urlRegex,
-		LineNumber:   323,
+		LineNumber:   0,
 		ColumnNumber: &columnNumber,
 	})
-
+	urlRegex2 := "^.*" + parDir + "/my-project2/node_modules/constructs/lib/construct.js$"
+	columnNumber2 := 9
+	client.Debugger.SetBreakpointByURL(ctx, &debugger.SetBreakpointByURLArgs{
+		URLRegex:     &urlRegex2,
+		LineNumber:   368,
+		ColumnNumber: &columnNumber2,
+	})
 	pausedClient, err = client.Debugger.Paused(ctx)
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 
@@ -124,6 +124,7 @@ func run(timeout time.Duration) error {
 	return nil
 }
 
+// var defaultVar :=["constructor"]
 func getLogicalIds(dataObj *runtime.RemoteObjectID, ctx context.Context) []string {
 	var logicalIds []string
 	LogicalIdObjects, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *dataObj})
@@ -256,75 +257,91 @@ func getStackId(dataObj *runtime.RemoteObjectID, ctx context.Context) (string, e
 	return stackId, nil
 }
 
-func getInternalProperties(object *runtime.GetPropertiesReply, ctx context.Context) {
-	internalProp := object.InternalProperties
-	for _, internalPropData := range internalProp {
-		Data, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *internalPropData.Value.ObjectID})
-		fmt.Print(Data)
-
-		// for _,insideData := range Data.Result{
-		// 	fmt.Print(insideData)
-		// }
+func CheckToEndConnection(bootStrapIds []string, stackIds []string) bool {
+	if len(bootStrapIds) == len(stackIds) {
+		sort.Strings(bootStrapIds)
+		sort.Strings(stackIds)
+		// Compare the slices element by element
+		equal := true
+		for i, v := range bootStrapIds {
+			if v != stackIds[i] {
+				equal = false
+				break
+			}
+		}
+		return equal
 	}
-}
-func getPath(callFrame debugger.CallFrame, ctx context.Context) (string, error) {
-	result, err := client.Debugger.EvaluateOnCallFrame(ctx, &debugger.EvaluateOnCallFrameArgs{
-		CallFrameID: callFrame.CallFrameID,
-		Expression:  "this.path",
-	})
-	if err != nil {
-		logger.DevLogger().Error("Error while Evaluating 'this.path' in debugger.client. Error:", err)
-		return "", err
-	}
-	var path string
-	json.Unmarshal(result.Result.Value, &path)
-	fmt.Println("This path is ", path)
-	return path, nil
-
+	return false
 }
 
-func getFileLocation(callFrame debugger.CallFrame, ctx context.Context, path string) (ResourceLocation, error) {
-	var fileLocation ResourceLocation
-	scriptId := callFrame.Location.ScriptID
-	src, err := client.Debugger.GetScriptSource(ctx, &debugger.GetScriptSourceArgs{ScriptID: scriptId})
-	if err != nil {
-		return fileLocation, err
+func getDataFromNBP(pathObjectId *runtime.RemoteObjectID, ctx context.Context) (string, error) {
+	insidePathData, errPD := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *pathObjectId})
+	if errPD != nil {
+		logger.DevLogger().Error("Error occured while getting Path Object, inside the meta. Error:", errPD)
+		return "", nil
 	}
-	mapURL := callFrame.URL
-	splitSrcLines := strings.Split(src.ScriptSource, "\n")
-	sourceMapBase64 := strings.Replace(splitSrcLines[len(splitSrcLines)-1], "//# sourceMappingURL=data:application/json;charset=utf-8;base64,", "", -1)
+	for _, insidePath := range insidePathData.Result {
+		if insidePath.Name == "0" {
+			zerothObject, errZ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *insidePath.Value.ObjectID})
+			if errZ != nil {
+				logger.DevLogger().Error("Error occured while Oth Object, inside PathObject. Error:", errZ)
+				return "", nil
+			}
+			for _, insideZerothObject := range zerothObject.Result {
+				if insideZerothObject.Name == "data" {
+					fmt.Print("\n insideZerothObject ", insideZerothObject.Name)
+					return insideZerothObject.Value.String(), nil
+				}
+			}
 
-	sourceMap, err := base64.StdEncoding.DecodeString(sourceMapBase64)
-	if err != nil {
-		return fileLocation, err
+		}
 	}
-	smap, err := sourcemap.Parse(mapURL, sourceMap)
-	if err != nil {
-		panic(err)
-		return fileLocation, err
+	return "", errors.New("DATANOTFOUND")
+}
+
+func getMetaData(metaDataObjectId *runtime.RemoteObjectID, ctx context.Context) error {
+	metaDataObjects, errMd := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *metaDataObjectId})
+	var pathToId map[string]string
+	if errMd != nil {
+		logger.DevLogger().Error("Error while getting metaData Object in DebuggerClient. Error:", errMd)
 	}
+	for _, insideMeta := range metaDataObjects.Result {
+		if *insideMeta.IsOwn {
+			if pathToId == nil {
+				pathToId = make(map[string]string)
+			}
+			PData, err := getDataFromNBP(insideMeta.Value.ObjectID, ctx)
+			if err != nil {
+				if err.Error() == "DATANOTFOUND" {
+					logger.DevLogger().Error("Error while getting data from inside the path (meta->path->error).Could not find data inside(meta-", insideMeta.Name, "-")
+					return err
+				} else {
+					logger.DevLogger().Error("Error while getting data from inside the path (meta->path->error). Error:", err)
+					return err
+				}
 
-	// chrome devtools protocol and it's implementation cdp has both line and column as 0 indexed
-	// For the sourcemap library used is considering line number as 1 indexed and column number as 0 indexed (both input and output)
-	// although their doc mentions that both line and column are 0 indexed
-	// doc: https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit
-	genline, gencol := callFrame.Location.LineNumber+1, *callFrame.Location.ColumnNumber
-	file, _, sourceline, sourcecol, _ := smap.Source(genline, gencol)
-	// fmt.Println(file, fn, sourceline, sourcecol, ok)
-	// fmt.Print(isPresent)
-	// fmt.Print("FOR Path ",path," mainfile Location :",sourceline,sourcecol,file)
-	// _, MappingPresent := pathToLocation[path]
-	// if !MappingPresent {
-	// 	ArrayResourceLocation := make([]ResourceLocation, 1)
-	// 	mainFileLocation := ResourceLocation{lineNumber: sourceline, colNumber: sourcecol, filePath: file}
-	// 	ArrayResourceLocation = append(ArrayResourceLocation, mainFileLocation)
-	// 	pathToLocation[path] = append(pathToLocation[path], mainFileLocation)
-	// }
-	fileLocation.colNumber = sourcecol
-	fileLocation.lineNumber = sourceline
-	fileLocation.filePath = file
+			}
+			pathToId[insideMeta.Name] = PData
+		}
 
-	return fileLocation, nil
+	}
+	fmt.Print(pathToId)
+	return nil
+}
+
+func CheckBreakPointFile(hitBreakPointsObject []string, ctx context.Context) (string, error) {
+	fmt.Print(hitBreakPointsObject)
+	for _, breakPoint := range hitBreakPointsObject {
+		if strings.Contains(breakPoint, "node_modules/constructs/lib/construct.js") {
+			return "construct", nil
+		} else if strings.Contains(breakPoint, "node_modules/aws-cdk-lib/core/lib/stack-synthesizers/_shared.js") {
+			return "_shared", nil
+		} else {
+			return breakPoint, errors.New("UNIDENTIFIEDFILE")
+		}
+
+	}
+	return "", errors.New("UNIDENTIFIEDFILE")
 }
 func parseResourceDataBreakpointData(ctx context.Context, conn *rpcc.Conn) error {
 	// defer wg.Done()
@@ -333,128 +350,53 @@ func parseResourceDataBreakpointData(ctx context.Context, conn *rpcc.Conn) error
 	if err != nil {
 		return err
 	}
+	if len(ev.HitBreakpoints) > 0 { // don't check for break on start
+		fileName, err := CheckBreakPointFile(ev.HitBreakpoints, ctx)
+		if err != nil {
+			if err.Error() == "UNIDENTIFIEDFILE" {
+				logger.DevLogger().Error("Break point put onUnidentified file. BreakPoint:", fileName, " Error:", err)
+				return err
+			}
+		}
+		if fileName == "Construct" {
+
+		} else if fileName == "_shared" {
+			if ev.Reason == "other" {
+				for _, callFrame := range ev.CallFrames {
+					if callFrame.FunctionName == "addStackArtifactToAssembly" {
+						for _, scopeChain := range callFrame.ScopeChain {
+							if scopeChain.Type == "local" {
+								localScope, errLs := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scopeChain.Object.ObjectID})
+								if errLs != nil {
+									logger.DevLogger().Error("Error while getting the localScope data in debugger client. Error:", errLs)
+								}
+								for _, localScopeData := range localScope.Result {
+									// stackIndex := -1
+									// metaIndex := -1
+									if localScopeData.Name == "stack" {
+										getStackData(localScopeData.Value.ObjectID, ctx)
+										// Here get the stackData as previously done
+									} else if localScopeData.Name == "meta" {
+										// fmt.Print(localScopeData)
+										errMd := getMetaData(localScopeData.Value.ObjectID, ctx)
+										fmt.Print(errMd)
+										conn.Close()
+									}
+
+								}
+							}
+						}
+					}
+				}
+			}
+			fmt.Print(stackToResourceToPath,stackToLogicalIds)
+		}
+	}
 
 	// extracting
 	//1. StackId-ConstructIDs-CDKPath
 	//2. StackId-LogicalIDs
 	// var stackIds []string
-	addChildIndex := -1
-	mainFileIndex := -1
-	stackFileIndex := -1
-	// var src *debugger.GetScriptSourceReply
-	if ev.Reason == "other" {
-		for index, callFrame := range ev.CallFrames {
-			if callFrame.FunctionName == "Construct" {
-				for _, scopeChain := range callFrame.ScopeChain {
-					if scopeChain.Type == "local" {
-						localScope, _ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scopeChain.Object.ObjectID})
-						// For storing the index of Id and Scope in localScopeResult array
-						bootStrapVersionIdIndex := -1
-						CdkMetaDataIndex := -1
-						scopeIndex := -1
-						for index, localScopeData := range localScope.Result {
-							if localScopeData.Name == "id" && localScopeData.Value.String() == "\"BootstrapVersion\"" {
-								bootStrapVersionIdIndex = index
-							} else if localScopeData.Name == "id" && localScopeData.Value.String() == "\"CDKMetadata\"" {
-								CdkMetaDataIndex = index
-							} else if localScopeData.Name == "scope" {
-								scopeIndex = index
-							}
-						}
-						//This gets called before BootstrapVersion is called for any stack
-						if CdkMetaDataIndex >= 0 && scopeIndex >= 0 {
-							ScopeDataObjectId := localScope.Result[scopeIndex].Value.ObjectID
-							stackID, err := getStackId(ScopeDataObjectId, ctx)
-							if err != nil {
-								return err
-							}
-							stackIds = append(stackIds, stackID)
-						}
-						// By this time all the stackIds have been prepared
-						if bootStrapVersionIdIndex >= 0 && scopeIndex >= 0 {
-							ScopeDataObjectId := localScope.Result[scopeIndex].Value.ObjectID
-							var allStackIds []string
-							stackId, err := getStackId(ScopeDataObjectId, ctx)
-							if err != nil {
-								logger.DevLogger().Error("Error while fetching stackID for BootStrapVersionID")
-								return err
-							}
-							allStackIds = append(allStackIds, stackId)
-							getStackData(ScopeDataObjectId, ctx)
-							fmt.Print("\n stackToLogicalIds ", stackToLogicalIds)
-							fmt.Print("\n resourceToType ", resourceIdToType)
-							fmt.Print("\n stackIdToresourceID ", stackIdToResourceIds)
-							fmt.Print("\n StackID -> ResourceID -> Path  ", stackToResourceToPath)
-							// if CheckToEndConnection(allStackIds,stackId){
-							// 	conn.Close()
-							// }
-
-						}
-						// For ending the client
-						// 1. Get the list of all the stacks present
-						// 1.a. From the time when map for location for each resource is being created
-						// 1.b  When id value is  'CDKMetadata' Keep collecting stackNames
-						// CDKMetadata is called for each stack before calling BootstrapVersion for any stack
-						// 2. When we encounter the 'CheckBootstrapVersion' or Just after BootstrapVersion of last stack End
-						// Also For gathering
-
-						// Since the Path already has ConstructID
-						// We can match the LogicalID to its ConstructID
-					}
-				}
-			}else if callFrame.FunctionName == "addChild" {
-				addChildIndex = index
-			}
-			if !strings.Contains(callFrame.URL, "node_modules") {
-				if strings.Contains(callFrame.URL, "bin"){ // think about the cases when multiple stacks present
-					// MainFile will be come first when only App is being constructed
-					// otherwise stackFile comes first
-					mainFileIndex = index
-					if stackFile == ""{
-						fmt.Print(callFrame.URL)
-						mainFile = callFrame.URL
-						strParts := strings.Split(mainFile,"bin")
-						stackFile = strParts[0]
-					}
-				}else if strings.Contains(callFrame.URL, stackFile){
-					stackFileIndex = index
-				}
-			}
-
-		}
-		var path string
-		if addChildIndex >= 0 && (mainFileIndex >= 0 || stackFileIndex >= 0) {
-			// create a map of path to location
-			path, err = getPath(ev.CallFrames[addChildIndex], ctx)
-			if err != nil {
-				return err
-			}
-			if pathToLocation == nil {
-				pathToLocation = make(map[string][]ResourceLocation)
-				// pathToLocation[path] = ResourceLocation{colNumber: 0, lineNumber: 0, filePath: ""}]
-			}
-			// pathToLocation[path] = ResourceLocation{colNumber: 0, lineNumber: 0, filePath: ""}
-			if mainFileIndex >= 0{
-				callFrame := ev.CallFrames[mainFileIndex]
-				mainFileLocation, err := getFileLocation(callFrame, ctx, path)
-				if err != nil {
-					logger.DevLogger().Error("Could not get mainfile location for path ", path, " Error:", err)
-				}
-				pathToLocation[path] = append(pathToLocation[path], mainFileLocation)
-
-			}
-			if stackFileIndex >= 0{
-				callFrame := ev.CallFrames[stackFileIndex]
-				stackFileLocation, err := getFileLocation(callFrame, ctx, path)
-				if err != nil {
-					logger.DevLogger().Error("Could not get stack location for path ", path, " Error:", err)
-				}
-				pathToLocation[path] = append(pathToLocation[path], stackFileLocation)
-			}
-		}
-
-		fmt.Print("MAPPINGS for path ", path, " are ", pathToLocation[path])
-	}
 
 	client.Debugger.Resume(ctx, &debugger.ResumeArgs{})
 	// wg.Add(1)
@@ -462,10 +404,76 @@ func parseResourceDataBreakpointData(ctx context.Context, conn *rpcc.Conn) error
 	return nil
 }
 
-func main() {
+
+
+func kmain() {
 	err := run(30000 * time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 }
+
+// if ev.Reason == "other"{
+// 	for _, callFrame := range ev.CallFrames{
+// 		if callFrame.FunctionName == "Construct"{
+// 			for _,scopeChain := range callFrame.ScopeChain{
+// 				if scopeChain.Type == "local"{
+// 					localScope,_ := client.Runtime.GetProperties(ctx, &runtime.GetPropertiesArgs{ObjectID: *scopeChain.Object.ObjectID})
+// 					// For storing the index of Id and Scope in localScopeResult array
+// 					bootStrapVersionIdIndex:=-1
+// 					CdkMetaDataIndex:=-1
+// 					scopeIndex :=-1
+// 					for index,localScopeData := range localScope.Result{
+// 						if localScopeData.Name == "id" && localScopeData.Value.String() == "\"BootstrapVersion\""{
+// 								bootStrapVersionIdIndex = index
+// 						}else if localScopeData.Name == "id" && localScopeData.Value.String() == "\"CDKMetadata\"" {
+// 								CdkMetaDataIndex = index
+// 						}else if localScopeData.Name == "scope"{
+// 								scopeIndex = index
+// 						}
+// 					}
+// 					//This gets called before BootstrapVersion is called for any stack
+// 					if CdkMetaDataIndex>=0 && scopeIndex>=0{
+// 						ScopeDataObjectId := localScope.Result[scopeIndex].Value.ObjectID
+// 						stackID,err :=getStackId(ScopeDataObjectId,ctx)
+// 						if err!= nil{
+// 							return err
+// 						}
+// 						stackIds = append(stackIds, stackID)
+// 					}
+// 					// By this time all the stackIds have been prepared
+// 					if bootStrapVersionIdIndex>=0 && scopeIndex>=0 {
+// 						ScopeDataObjectId := localScope.Result[scopeIndex].Value.ObjectID
+// 						var allStackIds []string
+// 						stackId,err:=getStackId(ScopeDataObjectId,ctx)
+// 						if err!= nil{
+// 							logger.DevLogger().Error("Error while fetching stackID for BootStrapVersionID")
+// 							return err
+// 						}
+// 						allStackIds = append(allStackIds, stackId)
+// 						getStackData(ScopeDataObjectId,ctx)
+// 						fmt.Print("\n stackToLogicalIds ", stackToLogicalIds)
+// 						fmt.Print("\n resourceToType ", resourceIdToType)
+// 						fmt.Print("\n stackIdToresourceID ", stackIdToResourceIds)
+// 						fmt.Print("\n StackID -> ResourceID -> Path  ", stackToResourceToPath)
+// 						if CheckToEndConnection(allStackIds,stackIds){
+// 							conn.Close()
+// 						}
+
+// 					}
+// 					// For ending the client
+// 					// 1. Get the list of all the stacks present
+// 						// 1.a. From the time when map for location for each resource is being created
+// 						// 1.b  When id value is  'CDKMetadata' Keep collecting stackNames
+// 						// CDKMetadata is called for each stack before calling BootstrapVersion for any stack
+// 					// 2. When we encounter the 'CheckBootstrapVersion' or Just after BootstrapVersion of last stack End
+// 					// Also For gathering
+
+// 					// Since the Path already has ConstructID
+// 					// We can match the LogicalID to its ConstructID
+// 				}
+// 			}
+// 		}
+// 	}
+// }
